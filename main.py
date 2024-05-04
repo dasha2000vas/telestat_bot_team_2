@@ -1,19 +1,16 @@
-import os
-from dotenv import load_dotenv
-from pyrogram import Client, filters
-
-load_dotenv()
-
-tg_id = os.getenv('TELEGRAM_ID')
-tg_hash = os.getenv('TELEGRAM_HASH')
-bot_tk = os.getenv('BOT_TOKEN')
+import asyncio
+from bot_parse import bot_parse
+from core.init_db import create_super_user
 
 
-app = Client("my_account", api_id=tg_id, api_hash=tg_hash, bot_token=bot_tk)
+def main():
+    bot_parse.run()
 
 
-@app.on_message(filters.text & filters.private)
-async def echo(client, message):
-    await message.reply(message.text)
-
-app.run()
+loop = asyncio.get_event_loop()
+tasks = [
+    loop.create_task(create_super_user()),
+    loop.create_task(main())
+]
+loop.run_until_complete(asyncio.wait(tasks))
+loop.close()
