@@ -1,6 +1,12 @@
 from pyrogram import Client, filters
 from settings import Config
 from pyrogram.types import Message
+
+from buttons.buttons import (
+    admin_keyboard,
+    data_collection_keyboard,
+    main_menu_keyboard
+)
 from permissions.permissions import check_authorization, create_admin
 
 
@@ -26,36 +32,80 @@ async def command_start(
         await client.send_message(
             message.chat.id,
             'Вы прошли авторизацию!',
+            reply_markup=main_menu_keyboard
         )
 
-        @bot_parse.on_message(filters.command('new_admin'))
-        async def new_admin(
-            client: Client,
-            message: Message
-        ):
+
+@bot_parse.on_message(filters.regex('Назад'))
+async def main_menu(
+    client: Client,
+    message: Message
+):
+    """Меню с основными разделами бота."""
+
+    await client.send_message(
+        message.chat.id,
+        'Выберите раздел',
+        reply_markup=main_menu_keyboard
+    )
+
+
+@bot_parse.on_message(filters.regex('Сбор данных'))
+async def data_collection_buttons(
+    client: Client,
+    message: Message
+):
+    """Действия, связанные со сбором данных."""
+
+    await client.send_message(
+        message.chat.id,
+        text='Выберите действие',
+        reply_markup=data_collection_keyboard
+    )
+
+
+@bot_parse.on_message(filters.regex('Управление админами'))
+async def admin_buttons(
+    client: Client,
+    message: Message
+):
+    """Действия, связанные с админами."""
+
+    await client.send_message(
+        message.chat.id,
+        text='Выберите действие',
+        reply_markup=admin_keyboard
+    )
+
+
+@bot_parse.on_message(filters.command('new_admin'))
+async def new_admin(
+    client: Client,
+    message: Message
+):
+    await client.send_message(
+        message.chat.id,
+        'Введите user_id и username администратора через запятую'
+    )
+
+    @bot_parse.on_message(filters.text)
+    async def get_user(
+        client: Client,
+        message: Message
+    ):
+        user = message.text.split(', ')
+        data = {
+            'user_id': int(user[0]),
+            'username': user[1],
+            'is_admin': True
+        }
+        if not await create_admin(data):
             await client.send_message(
                 message.chat.id,
-                'Введите user_id и username администратора через запятую'
+                'Ошибка'
             )
-
-            @bot_parse.on_message(filters.text)
-            async def get_user(
-                client: Client,
-                message: Message
-            ):
-                user = message.text.split(', ')
-                data = {
-                    'user_id': int(user[0]),
-                    'username': user[1],
-                    'is_admin': True
-                }
-                if not await create_admin(data):
-                    await client.send_message(
-                        message.chat.id,
-                        'Ошибка'
-                    )
-                else:
-                    await client.send_message(
-                        message.chat.id,
-                        'Новый админ создан'
-                    )
+        else:
+            await client.send_message(
+                message.chat.id,
+                'Новый админ создан'
+            )
