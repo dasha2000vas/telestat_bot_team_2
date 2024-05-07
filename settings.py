@@ -15,3 +15,4 @@ class Config(object):
     BOT_TOKEN = os.getenv('BOT_TOKEN_PARSE')
     MY_ID = os.getenv('MY_ID')
     MY_USERNAME = os.getenv('MY_USERNAME')
+    CHANNEL_ID = os.getenv('CHANNEL_ID')
