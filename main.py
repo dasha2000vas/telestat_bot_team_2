@@ -3,6 +3,7 @@ from bot_parse import bot_parse
 from core.init_db import create_super_user
 
 
+
 def main():
     bot_parse.run()
 
