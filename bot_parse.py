@@ -127,7 +127,10 @@ async def parsing_info(client: Client, message: Message):
             file.write(f"Last Name: {user['Last Name']}\n")
             file.write(f"Is Bot: {user['Is Bot']}\n")
             file.write(f"Joined Date: {user['Joined Date']}\n")
-            file.write(f"Profile Photo File ID: {user['Profile Photo File ID']}\n\n")
+            file.write(f"Profile Photo File ID: {user['Profile Photo File ID']}\n")
+            file.write(f"Phone number: {user['Phone number']}\n")
+            file.write(f"Language code: {user['Language code']}\n")
+            file.write(f"Country: {user['Country']}\n\n")
 
     await client.send_document(chat_id, file_name)
     os.remove(file_name)
