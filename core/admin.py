@@ -1,56 +1,31 @@
-from settings import Config
-from constants import COUNTRY_CODES, LANGUAGE_CODES
+from core.db import async_session
+from crud.admins import admins_crud
+from permissions.permissions import check_authorization
 
 
-async def get_users_channel(client):
-    user_data = []
-    async for member in client.get_chat_members(Config.CHANNEL_ID):
-        photo_file_id = None
-        if member.user.photo:
-            photo_file_id = member.user.photo.big_file_id
-        phone_number = member.user.phone_number
-        language_code = member.user.language_code
-        country = await get_country({"phone_number": phone_number, "language_code": language_code})
-
-        user_data.append({
-            "ID": member.user.id,
-            "Username": member.user.username,
-            "First Name": member.user.first_name,
-            "Last Name": member.user.last_name,
-            "Is Bot": member.user.is_bot,
-            "Joined Date": member.joined_date.strftime(
-             "%Y-%m-%d %H:%M:%S") if member.joined_date else None,
-            "Profile Photo File ID": photo_file_id,
-            "Phone number": phone_number,
-            "Language code": language_code,
-            "Country": country
-        })
-
-    return user_data
-
-
-async def get_users_channels(client):
-    member_count = await client.get_chat_members_count(Config.CHANNEL_ID)
-    return member_count
-
-
-async def get_country(user_data):
-    if user_data.get("phone_number"):
-        phone_country = await get_country_phone_number(user_data["phone_number"])
-        return phone_country
-    elif user_data.get("language_code"):
-        language_country = await get_country_language_code(user_data["language_code"])
-        return language_country
+async def create_admin(obj):
+    """Создание нового админа"""
+    db_obj = await check_authorization(obj['user_id'])
+    if db_obj:
+        return False
     else:
-        return "Неизвестно"
+        async with async_session() as session:
+            db_obj = await admins_crud.create(obj, session)
+        return db_obj
 
 
-async def get_country_phone_number(phone_number):
-    for code, country in COUNTRY_CODES.items():
-        if phone_number.startswith(code):
-            return country
-    return "Неизвестно"
+async def delete_admin(user_id=None):
+    """Удаление админа из БД"""
+    db_obj = await check_authorization(user_id)
+    if db_obj is None:
+        return False
+    else:
+        async with async_session() as session:
+            await admins_crud.remove(db_obj, session)
+        return True
 
 
-async def get_country_language_code(language_code):
-    return LANGUAGE_CODES.get(language_code, "Неизвестно")
+async def get_all_admins():
+    async with async_session() as session:
+        all_admins = await admins_crud.get_multi(session)
+    return all_admins
