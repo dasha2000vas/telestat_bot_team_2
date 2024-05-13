@@ -13,28 +13,6 @@ def use_inspector(conn):
     return inspector.get_table_names()
 
 
-# async def create_user(
-#     user_id,
-#     username,
-#     is_superuser,
-#     is_admin,
-# ):
-#     data = {'user_id': user_id,
-#             'username': username,
-#             'is_superuser': is_superuser,
-#             'is_admin': is_admin
-#             }
-#     db_obj = Admins(**data)
-#     try:
-#         async with async_session() as session:
-#             session.add(
-#                 db_obj
-#                 )
-#             await session.commit()
-#     except Exception:
-#         pass
-
-
 async def create_super_user():
     async with engine.connect() as conn:
         tables = await conn.run_sync(use_inspector)

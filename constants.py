@@ -6,7 +6,7 @@ COUNTRY_CODES = {
     "44": "UK",
     "33": "France",
     "7": "Russia",
-    "9": "Russia",
+    "964": "Iraq",
     "49": "Germany",
     "86": "China",
     "81": "Japan",
@@ -43,7 +43,13 @@ class Commands(Enum):
     add_admin = 'Добавить админа'
     del_admin = 'Удалить админа'
     all_admins = 'Все админы'
-    collect_data = 'Cбор данных'
-    run_data_collection = 'Начать сбор данных'
-    time_management = 'Задать интервал сбора данных'
+    collect_data = 'Сбор данных'
+    time_management = 'Настройка интервала и сбор данных'
     back = 'Назад'
+
+
+class BotParseManager:
+    add_admin_flag = False
+    del_admin_flag = False
+    set_interval_flag = {}
+    interval = {}
