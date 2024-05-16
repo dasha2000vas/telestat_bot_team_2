@@ -1,6 +1,6 @@
-from settings import Config
 from enum import Enum
-
+"""Два словаря для определения страны пользователя по номеру телефона или
+языку. Если скрыто, то страна - Неизвестно"""
 COUNTRY_CODES = {
     "1": "USA",
     "44": "UK",
@@ -18,8 +18,8 @@ COUNTRY_CODES = {
 }
 
 LANGUAGE_CODES = {
-    "en": "English",
-    "fr": "French",
+    "en": "Europe/USA",
+    "fr": "France",
     "ru": "Russia",
     "es": "Spain",
     "de": "Germany",
@@ -30,26 +30,25 @@ LANGUAGE_CODES = {
     "pt": "Portugal",
 }
 
-SUPERUSER = {
-    'user_id': Config.MY_ID,
-    'username': Config.MY_USERNAME,
-    'is_superuser': True,
-    'is_admin': True
-}
-
 
 class Commands(Enum):
+    """Команды для хэндлеров"""
     admin_management = 'Управление админами'
     add_admin = 'Добавить админа'
     del_admin = 'Удалить админа'
     all_admins = 'Все админы'
     collect_data = 'Сбор данных'
     time_management = 'Настройка интервала и сбор данных'
+    remove_job = 'Отменить сбор данных'
     back = 'Назад'
+    request_report = 'Сформировать отчет'
 
 
 class BotParseManager:
+    """Флаги для перехвата всех сообщений"""
     add_admin_flag = False
     del_admin_flag = False
-    set_interval_flag = {}
+    set_interval_flag = {1: False}
     interval = {}
+    set_report_flag = {1: False}
+    report = {}

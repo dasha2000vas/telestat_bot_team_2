@@ -1,8 +1,8 @@
 from pyrogram import Client, filters
-from settings import Config
+from settings import Configs, manager, configure_logging
 from pyrogram.types import Message, CallbackQuery
 
-from constants import Commands, BotParseManager
+from constants import Commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 
@@ -19,17 +19,18 @@ from core.admin import create_admin, delete_admin, get_all_admins
 from core.validation import validate_data_on_create, validate_data_on_delete
 from services.get_data_tlg import (
     GetParticipantInfo, get_data, get_msg,
-    get_channels, get_chat_invite_links, get_chat_link_joiners)
+    get_channels, get_chat_invite_links, get_chat_link_joiners
+)
+
+logger = configure_logging()
 
 bot_parse = Client(
-    "my_account", api_id=Config.API_ID,
-    api_hash=Config.API_HASH, bot_token=Config.BOT_TOKEN
+    "my_account", api_id=Configs.API_ID,
+    api_hash=Configs.API_HASH, bot_token=Configs.BOT_TOKEN
 )
 
 scheduler = AsyncIOScheduler()
 scheduler.start()
-
-manager = BotParseManager()
 
 
 @bot_parse.on_message(filters.command('start'))
@@ -38,21 +39,26 @@ async def command_start(
     message: Message
 ):
     """Обработчик команды на запуск бота по сбору данных."""
+    logger.info('Авторизация')
     if not await check_admin(message.from_user.id):
         await client.send_message(
             message.chat.id,
             'Управлять ботом могут только Администраторы.'
         )
+        logger.warning(f'Пользователь {message.from_user.username} не прошел авторизацию')
     else:
         await client.send_message(
             message.chat.id,
             'Вы прошли авторизацию!',
             reply_markup=main_menu_keyboard
         )
+        logger.info(f'Пользователь {message.from_user.username} прошел авторизацию')
 
 
 @bot_parse.on_message(filters.command('get_channels'))
 async def get_channels_admin(client: Client, message: Message):
+    """Недоработано. Метод возвращает все каналы владельца,
+    на котором открыта сессия"""
     channels = await get_channels()
     msg = ''
     for channel in channels.chats:
@@ -66,6 +72,10 @@ async def get_channels_admin(client: Client, message: Message):
 
 @bot_parse.on_message(filters.command('get_joiners'))
 async def get_joiners(client: Client, message: Message):
+    """Недоработано. В телеграмме собрать все возможные пригласительные
+    ссылки с канала может только владелец канал. Админ может собрать только
+    свои ссылки. Тогда отчеты должен формировать только владелец канал, чтобы
+    можно было собрать полный отчет по желанию заказчика"""
     links_lst = []
     joiners = {}
     objs = await get_chat_invite_links(chat_id='test_telestat2', admin_id='me')
@@ -114,9 +124,11 @@ async def new_admin(
     client: Client,
     message: Message
 ):
+    """Добавление админа. Только суперпользователь!"""
     if not await check_superuser(message.from_user.id):
         await client.send_message(
             message.chat.id, 'Добавить админа может только суперпользователь!')
+        logger.warning(f'Пользователь {message.from_user.username} пытался добавить админа')
     else:
         await client.send_message(
             message.chat.id,
@@ -130,9 +142,11 @@ async def del_admin(
     client: Client,
     message: Message
 ):
+    """Удаление админа. Только суперпользователь!"""
     if not await check_superuser(message.from_user.id):
         await client.send_message(
             message.chat.id, 'Удалить админа может только суперпользователь!')
+        logger.warning(f'Пользователь {message.from_user.username} пытался удалить админа')
     else:
         await client.send_message(
             message.chat.id,
@@ -146,9 +160,11 @@ async def all_admins(
     client: Client,
     message: Message
 ):
+    """Список админов. Все админы могут пользоваться!"""
     if not await check_superuser(message.from_user.id):
         await client.send_message(
             message.chat.id, 'Получить список админов может только суперпользователь!')
+        logger.warning(f'Пользователь {message.from_user.username} пытался получить список всех админов')
     else:
         admins_list = await get_all_admins()
         reply_message = ''
@@ -159,6 +175,7 @@ async def all_admins(
             message.chat.id,
             reply_message
         )
+        logger.info('Получены все пользователи')
 
 
 @bot_parse.on_message(filters.regex(Commands.collect_data.value))
@@ -175,12 +192,26 @@ async def data_collection_buttons(
     )
 
 
+@bot_parse.on_message(filters.regex(Commands.remove_job.value))
+async def remove_job_button(
+    client: Client,
+    message: Message
+):
+    """Недоработано. Не получилось создать в БД таблицу с запланированными работами"""
+    print(scheduler.get_job('test_telestat2'))
+    await client.send_message(
+        message.chat.id,
+        text='Укажите id запланированной работы по сбору данных'
+    )
+
+
 @bot_parse.on_message(filters.regex(Commands.time_management.value))
 async def time_management(client: Client, message: Message):
-
+    """Настройка интервала и сбор данных. Только админы!"""
     if not await check_admin(message.from_user.id):
         await client.send_message(
             message.chat.id, 'Настраивать время и собирать данные может только админ!')
+        logger.warning(f'Пользователь {message.from_user.username} пытался собрать данные')
     else:
         await client.send_message(
                 message.chat.id,
@@ -190,6 +221,8 @@ async def time_management(client: Client, message: Message):
 
     @bot_parse.on_callback_query()
     async def set_time(client: Client, callback: CallbackQuery):
+        """Ловим колбэк с клавиатуры. Варианты: установленный интервал, свой
+        интервал и без интервала"""
         manager.interval[callback.from_user.id] = callback.data
         msg = ''
         if manager.interval[callback.from_user.id] == 'custom':
@@ -210,6 +243,7 @@ async def all_incoming_messages(
     message: Message,
     manager=manager
 ):
+    """Ловим все сообщения в зависимости от наличия флага"""
     if manager.add_admin_flag:
         obj = await validate_data_on_create(message.text)
         if not obj:
@@ -217,17 +251,20 @@ async def all_incoming_messages(
                 message.chat.id,
                 'Ошибка при валидации данных'
             )
+            logger.warning('Ошибка при валидации данных')
         else:
             if not await create_admin(obj):
                 await client.send_message(
                     message.chat.id,
                     'Админ с таким user_id уже существует'
                 )
+                logger.warning('Попытка создать админа с существующим user_id')
             else:
                 await client.send_message(
                     message.chat.id,
                     'Новый админ создан'
                 )
+                logger.info('Добавлен новый админ')
             manager.add_admin_flag = False
 
     if manager.del_admin_flag:
@@ -237,17 +274,20 @@ async def all_incoming_messages(
                 message.chat.id,
                 'Ошибка при валидации данных'
             )
+            logger.warning('Ошибка при валидации данных')
         else:
             if not await delete_admin(obj):
                 await client.send_message(
                     message.chat.id,
                     'Админ с таким user_id не существует'
                 )
+                logger.warning('Попытка удалить несуществующего админа')
             else:
                 await client.send_message(
                     message.chat.id,
                     f'Админ с user_id {obj} удален'
                 )
+                logger.info('Удален админ')
                 manager.del_admin_flag = False
 
     if manager.set_interval_flag[message.from_user.id]:
@@ -258,18 +298,21 @@ async def all_incoming_messages(
         if value[1] == 'no_interval':
             await client.send_message(
                 message.chat.id,
-                'Собираю данные. Интервал не настроен.',
+                'Собираю данные. Интервал не настроен. По окончании придет ссылка на файл',
                 reply_markup=main_menu_keyboard
             )
+            logger.info('Идет сбора данных')
             await get_data(channel, client, message)
         else:
             await client.send_message(
                 message.chat.id,
-                f'Собираю данные. Задача будет выполняться с заданным интервалом - {value[1]} мин.',
+                f'Собираю данные. Задача будет выполняться с заданным интервалом - {value[1]} мин. По окончании будет приходить ссылка на файл',
                 reply_markup=main_menu_keyboard
             )
+            logger.info('Идет сбор данных')
             await get_data(channel, client, message)
             scheduler.add_job(get_data, 'interval', minutes=int(value[1]), kwargs={'channel': channel, 'client': client, 'message': message}, id=value[0] + f'_{message.from_user.id}', replace_existing=True)
-            print(scheduler.print_jobs())
+            logger.info(f'Запланирован сбор данных с интервалом {value[1]} минут')
+            logger.info(scheduler.print_jobs())
         del manager.interval[message.from_user.id]
         del manager.set_interval_flag[message.from_user.id]

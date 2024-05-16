@@ -5,14 +5,16 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
+    AsyncSession
 )
 from sqlalchemy.orm import (
     declarative_base,
     declared_attr,
 )
 from settings import (
-    Config,
+    Configs, configure_logging
 )
+logger = configure_logging()
 
 
 class PreBase:
@@ -32,6 +34,8 @@ class PreBase:
 
 Base = declarative_base(cls=PreBase)
 
-engine = create_async_engine(Config.DB_URL)
+engine = create_async_engine(Configs.DB_URL)
 
-async_session = async_sessionmaker(engine)
+async_session = async_sessionmaker(
+    bind=engine, class_=AsyncSession, expire_on_commit=False
+)

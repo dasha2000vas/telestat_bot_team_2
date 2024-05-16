@@ -4,9 +4,22 @@ from functools import wraps
 from aiogoogle.auth.creds import ServiceAccountCreds
 
 from dotenv import load_dotenv
+from constants import BotParseManager
+import logging
+from pathlib import Path
+from logging.handlers import RotatingFileHandler
+
+manager = BotParseManager()
 
 
 load_dotenv()
+
+
+BASE_DIR = Path(__file__).parent
+LOG_FORMAT = '#%(levelname)-8s [%(asctime)s] - %(filename)s:'\
+             '%(lineno)d - %(name)s - %(message)s'
+DT_FORMAT = '%d.%m.%Y %H:%M:%S'
+
 
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -27,13 +40,14 @@ INFO = {
 }
 
 
-class Config(object):
+class Configs(object):
     """Конфигурация проекта."""
 
     DB_URL = os.getenv('DB_URL')
     API_ID = os.getenv('API_ID')
     API_HASH = os.getenv('API_HASH')
     BOT_TOKEN = os.getenv('BOT_TOKEN_PARSE')
+    BOT_TOKEN_REPORT = os.getenv('BOT_TOKEN_REPORT')
     MY_ID = os.getenv('MY_ID')
     MY_USERNAME = os.getenv('MY_USERNAME')
     CHANNEL_ID = os.getenv('CHANNEL_ID')
@@ -46,13 +60,22 @@ class Config(object):
 
 user_bot = Client(
     'user_acc',
-    api_hash=Config.API_HASH,
-    api_id=Config.API_ID,
-    phone_number=Config.MY_PHONE
+    api_hash=Configs.API_HASH,
+    api_id=Configs.API_ID,
+    phone_number=Configs.MY_PHONE
 )
 
 
+SUPERUSER = {
+    'user_id': Configs.MY_ID,
+    'username': Configs.MY_USERNAME,
+    'is_superuser': True,
+    'is_admin': True
+}
+
+
 def bot_user(func):
+    """Для запуска еще одной сессий для методов где нужен User аккаунт"""
     @wraps(func)
     async def wrapper(*args, **kwargs):
         await user_bot.start()
@@ -62,3 +85,27 @@ def bot_user(func):
         finally:
             await user_bot.stop()
     return wrapper
+
+
+def configure_logging():
+    """Конфигурация логов."""
+
+    log_dir = BASE_DIR / 'logs'
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / 'telestat_bot.log'
+    rotating_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10 ** 6,
+        backupCount=5,
+        encoding='utf-8',
+    )
+    logging.basicConfig(
+        datefmt=DT_FORMAT,
+        format=LOG_FORMAT,
+        level=logging.INFO,
+        handlers=(
+            rotating_handler,
+            logging.StreamHandler(),
+        ),
+    )
+    return logging

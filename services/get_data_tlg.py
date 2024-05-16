@@ -1,7 +1,6 @@
 from pyrogram import Client
 from constants import COUNTRY_CODES, LANGUAGE_CODES
-import os
-from settings import Config
+from settings import Configs, configure_logging
 from aiogoogle import Aiogoogle
 from pyrogram.raw import functions
 from settings import bot_user, user_bot
@@ -9,8 +8,11 @@ from services.google_api_services import (
     check_spreadsheet_exist,
     create_sheet,
     create_spreadsheet,
-    spreadsheet_update_values
+    spreadsheet_update_values,
 )
+from string import ascii_lowercase
+
+logger = configure_logging()
 
 
 class GetParticipantInfo():
@@ -25,31 +27,42 @@ class GetParticipantInfo():
         self.value = value
 
     async def get_members_channel(self):
-        member_data = []
-        async for member in self.bot.get_chat_members(self.value):
-            photo_file_id = None
-            if member.user.photo:
-                photo_file_id = member.user.photo.big_file_id
+        collected_data = []
+        member_list = []
+        photo_file_id = None
+        characters = [''] + [str(i) for i in range(10)] + [i for i in ascii_lowercase]
+        for q in characters:
+            async for member in self.bot.get_chat_members(
+                self.value, query=q
+            ):
+                if member not in collected_data:
+                    collected_data.append(member)
+
+        for user in collected_data:
+            try:
+                photo_file_id = user.user.photo.big_file_id
+            except AttributeError:
+                photo_file_id = 'Фото отсутствует'
             country = await get_country(
-                {"phone_number": member.user.phone_number,
-                 "language_code": member.user.language_code}
+                {"phone_number": user.user.phone_number,
+                    "language_code": user.user.language_code}
                 )
 
-            member_data.append({
-                "ID": member.user.id,
-                "Username": member.user.username,
-                "First Name": member.user.first_name,
-                "Last Name": member.user.last_name,
-                "Is Bot": member.user.is_bot,
-                "Joined Date": member.joined_date.strftime(
-                    "%Y-%m-%d %H:%M:%S") if member.joined_date else None,
+            member_list.append({
+                "ID": user.user.id,
+                "Username": user.user.username,
+                "First Name": user.user.first_name,
+                "Last Name": user.user.last_name,
+                "Is Bot": user.user.is_bot,
+                "Joined Date": user.joined_date.strftime(
+                    "%Y-%m-%d %H:%M:%S") if user.joined_date else 'Отсутствует',
                 "Profile Photo File ID": photo_file_id,
-                "Phone number": member.user.phone_number,
-                "Language code": member.user.language_code,
+                "Phone number": user.user.phone_number,
+                "Language code": user.user.language_code,
                 "Country": country
             })
 
-        return member_data
+        return member_list
 
     async def get_members_count(self):
         return await self.bot.get_chat_members_count(self.value)
@@ -81,28 +94,8 @@ async def get_country_language_code(language_code):
 
 async def get_data(channel, client, message):
     member_list = await channel.get_members_channel()
-    total_members = await channel.get_members_count()
-    file_name = "user_data.txt"
-    with open(file_name, "w", encoding="utf-8") as file:
-        file.write(f"Total Users: {total_members}\n\n")
-        for user in member_list:
-            file.write(f"ID: {user['ID']}\n")
-            file.write(f"Username: {user['Username']}\n")
-            file.write(f"First Name: {user['First Name']}\n")
-            file.write(f"Last Name: {user['Last Name']}\n")
-            file.write(f"Is Bot: {user['Is Bot']}\n")
-            file.write(f"Joined Date: {user['Joined Date']}\n")
-            file.write(f"Profile Photo File ID: {user['Profile Photo File ID']}\n")
-            file.write(f"Phone number: {user['Phone number']}\n")
-            file.write(f"Language code: {user['Language code']}\n")
-            file.write(f"Country: {user['Country']}\n\n")
-
-    await client.send_document(message.chat.id, file_name)
-    await client.send_message(
-        message.chat.id, f"Собрано информации о {total_members} пользователях.")
-    os.remove(file_name)
     async with Aiogoogle(
-        service_account_creds=Config.CREDENTIALS
+        service_account_creds=Configs.CREDENTIALS
     ) as wrapper_services:
         spreadsheet_id = await check_spreadsheet_exist(
             wrapper_services, channel.value
@@ -121,9 +114,10 @@ async def get_data(channel, client, message):
         )
         await client.send_message(
             message.chat.id,
-            f"Собрано информации о {total_members} пользователях. Ссылка на файл:"
+            f"Собрана информация о {len(member_list)} пользователях. Ссылка на файл:\n"
             f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
         )
+        logger.info(f'Собрана информация о {len(member_list)} пользователях')
 
 
 async def get_msg(msg, interval):
@@ -157,3 +151,46 @@ async def get_chat_invite_links(chat_id: str, admin_id: str, bot: Client = user_
     async for item in links:
         items.append(item)
     return items
+
+
+@bot_user
+async def get_chat_messages(chat_id):
+    """Возвращает последние сообщения"""
+    last_messages = []
+    async for message in user_bot.get_chat_history(chat_id):
+        last_messages.append(message)
+    logger.info('Собраны последние сообщения')
+    return last_messages
+
+
+async def get_activity(chat_id):
+    """Возвращает количество просмотров/реакций/репостов"""
+    reactions = []
+    views = []
+    forwards = []
+    for activity in await get_chat_messages(chat_id):
+        if activity.reactions:
+            for reaction in activity.reactions.reactions:
+                try:
+                    if reaction.count:
+                        reactions.append(reaction.count)
+                except AttributeError:
+                    pass
+        try:
+            if activity.forwards:
+                forwards.append(activity.forwards)
+        except AttributeError:
+            pass
+        try:
+            if activity.views:
+                views.append(activity.views)
+        except AttributeError:
+            pass
+
+    data = {
+        'avg_views': 0 if len(views) == 0 else round(sum(views)/len(views), 2),
+        'avg_reactions': 0 if len(reactions) == 0 else round(sum(reactions)/len(reactions), 2),
+        'avg_forwards': 0 if len(forwards) == 0 else round(sum(forwards)/len(forwards), 2)
+        }
+    logger.info('Собраны данные о последних активностях')
+    return data

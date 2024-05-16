@@ -2,10 +2,12 @@
 
 from sqlalchemy import inspect
 from core.db import async_session, engine
-from settings import Config
+from settings import Configs
 from crud.admins import admins_crud
 
-from constants import SUPERUSER
+from settings import SUPERUSER, configure_logging
+
+logger = configure_logging()
 
 
 def use_inspector(conn):
@@ -14,12 +16,12 @@ def use_inspector(conn):
 
 
 async def create_super_user():
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         tables = await conn.run_sync(use_inspector)
         if 'admins' in tables:
             try:
                 async with async_session() as session:
-                    if not await admins_crud.get(Config.MY_ID, session):
+                    if not await admins_crud.get(Configs.MY_ID, session):
                         await admins_crud.create(SUPERUSER, session)
             except Exception:
                 pass

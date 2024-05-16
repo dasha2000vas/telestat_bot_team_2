@@ -10,7 +10,8 @@ main_menu_keyboard = ReplyKeyboardMarkup(keyboard=[
 
 data_collection_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Назад')],
-    [KeyboardButton(text='Настройка интервала и сбор данных')]
+    [KeyboardButton(text='Настройка интервала и сбор данных')],
+    # [KeyboardButton(text='Отменить сбор данных')]
 ], resize_keyboard=True)
 
 admin_keyboard = ReplyKeyboardMarkup(keyboard=[
@@ -18,6 +19,10 @@ admin_keyboard = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text='Добавить админа')],
     [KeyboardButton(text='Удалить админа')],
     [KeyboardButton(text='Все админы')]
+], resize_keyboard=True)
+
+report_menu_keyboard = ReplyKeyboardMarkup(keyboard=[
+    [KeyboardButton(text='Сформировать отчет')]
 ], resize_keyboard=True)
 
 
@@ -61,3 +66,12 @@ time_keyboard = InlineKeyboardMarkup(
         ]
     ]
 )
+
+
+async def make_inline_keyboard(value):
+    lst = []
+    for i, v in value.items():
+        button = [InlineKeyboardButton(text=i, callback_data=v)]
+        lst.append(button)
+    keyboard = InlineKeyboardMarkup(lst)
+    return keyboard
