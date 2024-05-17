@@ -258,6 +258,7 @@ async def set_time(client: Client, callback: CallbackQuery):
 async def set_channel(client: Client, callback: CallbackQuery):
     if callback.data == 'other':
         await callback.edit_message_text('Введите username канала', reply_markup=None)
+        manager.set_channel_flag[callback.from_user.id] = True
     else:
         manager.interval[callback.from_user.id] = [callback.data]
         await callback.edit_message_text(
@@ -266,14 +267,14 @@ async def set_channel(client: Client, callback: CallbackQuery):
         )
 
 
-@bot_parse.on_message(filters.text)
-async def set_time_message(client: Client, message: Message):
-    manager.interval[message.from_user.id] = [message.text]
-    await client.send_message(
-        message.from_user.id,
-        'Выберите интервал для сбора данных',
-        reply_markup=time_keyboard
-    )
+# @bot_parse.on_message(filters.text)
+# async def set_time_message(client: Client, message: Message):
+#     manager.interval[message.from_user.id] = [message.text]
+#     await client.send_message(
+#         message.from_user.id,
+#         'Выберите интервал для сбора данных',
+#         reply_markup=time_keyboard
+#     )
 
 
 @bot_parse.on_message(filters.text)
@@ -328,3 +329,12 @@ async def all_incoming_messages(
                 )
                 logger.info('Удален админ')
                 manager.del_admin_flag = False
+
+    if manager.set_channel_flag.get(message.from_user.id):
+        manager.interval[message.from_user.id] = [message.text]
+        await client.send_message(
+            message.from_user.id,
+            'Выберите интервал для сбора данных',
+            reply_markup=time_keyboard
+        )
+        del manager.set_channel_flag[message.from_user.id]

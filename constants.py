@@ -53,3 +53,4 @@ class BotParseManager:
     set_report_flag = {1: False}
     report = {}
     files = {}
+    set_channel_flag = {1: False}
