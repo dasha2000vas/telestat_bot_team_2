@@ -52,3 +52,4 @@ class BotParseManager:
     interval = {}
     set_report_flag = {1: False}
     report = {}
+    files = {}

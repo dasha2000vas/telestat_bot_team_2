@@ -5,12 +5,13 @@ from pyrogram.types import Message, CallbackQuery
 from constants import Commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-
+from filters import time_filter
 from buttons.buttons import (
     admin_keyboard,
     data_collection_keyboard,
     main_menu_keyboard,
-    time_keyboard
+    time_keyboard,
+    make_inline_keyboard,
 )
 from permissions.permissions import (
     check_admin, check_superuser
@@ -18,7 +19,7 @@ from permissions.permissions import (
 from core.admin import create_admin, delete_admin, get_all_admins
 from core.validation import validate_data_on_create, validate_data_on_delete
 from services.get_data_tlg import (
-    GetParticipantInfo, get_data, get_msg,
+    GetParticipantInfo, get_data,
     get_channels, get_chat_invite_links, get_chat_link_joiners
 )
 
@@ -213,28 +214,66 @@ async def time_management(client: Client, message: Message):
             message.chat.id, 'Настраивать время и собирать данные может только админ!')
         logger.warning(f'Пользователь {message.from_user.username} пытался собрать данные')
     else:
+        values = await get_channels()
         await client.send_message(
                 message.chat.id,
-                'Установите интервал сбора данных',
-                reply_markup=time_keyboard
+                'Выберите канал для сбора данных. Если канала нет в списке, введите его username',
+                reply_markup=await make_inline_keyboard(values)
             )
 
-    @bot_parse.on_callback_query()
-    async def set_time(client: Client, callback: CallbackQuery):
-        """Ловим колбэк с клавиатуры. Варианты: установленный интервал, свой
-        интервал и без интервала"""
-        manager.interval[callback.from_user.id] = callback.data
-        msg = ''
-        if manager.interval[callback.from_user.id] == 'custom':
-            msg += 'Введите chat_id канала или группы. Через запятую с пробелом добавьте интервал в минутах'
+
+@bot_parse.on_callback_query(time_filter)
+async def set_time(client: Client, callback: CallbackQuery):
+    """Ловим колбэк с клавиатуры. Варианты: установленный интервал, свой
+    интервал и без интервала"""
+    manager.interval[callback.from_user.id].append(callback.data)
+    manager.set_interval_flag[callback.from_user.id] = True
+    if manager.set_interval_flag[callback.from_user.id]:
+        value = manager.interval[callback.from_user.id]
+        channel = GetParticipantInfo(
+                client, value[0]
+            )
+        if value[1] == 'no_interval':
+            await callback.edit_message_text(
+                'Собираю данные. Интервал не настроен. По окончании придет ссылка на файл',
+                reply_markup=main_menu_keyboard
+            )
+            logger.info('Идет сбора данных')
+            await get_data(channel, client, callback)
         else:
-            msg += 'Введите chat_id канала или группы'
-        await client.delete_messages(message.chat.id, callback.message.id)
-        await client.send_message(
-            callback.message.chat.id,
-            msg
+            await callback.edit_message_text(
+                f'Собираю данные. Задача будет выполняться с заданным интервалом - {value[1]} мин. По окончании будет приходить ссылка на файл',
+                reply_markup=main_menu_keyboard
+            )
+            logger.info('Идет сбор данных')
+            await get_data(channel, client, callback)
+            scheduler.add_job(get_data, 'interval', minutes=int(value[1]), kwargs={'channel': channel, 'client': client, 'callback': callback}, id=value[0] + f'_{callback.from_user.id}', replace_existing=True)
+            logger.info(f'Запланирован сбор данных с интервалом {value[1]} минут')
+            logger.info(scheduler.print_jobs())
+        del manager.interval[callback.from_user.id]
+        del manager.set_interval_flag[callback.from_user.id]
+
+
+@bot_parse.on_callback_query()
+async def set_channel(client: Client, callback: CallbackQuery):
+    if callback.data == 'other':
+        await callback.edit_message_text('Введите username канала', reply_markup=None)
+    else:
+        manager.interval[callback.from_user.id] = [callback.data]
+        await callback.edit_message_text(
+            'Выберите интервал для сбора данных',
+            reply_markup=time_keyboard
         )
-        manager.set_interval_flag[callback.from_user.id] = True
+
+
+@bot_parse.on_message(filters.text)
+async def set_time_message(client: Client, message: Message):
+    manager.interval[message.from_user.id] = [message.text]
+    await client.send_message(
+        message.from_user.id,
+        'Выберите интервал для сбора данных',
+        reply_markup=time_keyboard
+    )
 
 
 @bot_parse.on_message(filters.text)
@@ -289,30 +328,3 @@ async def all_incoming_messages(
                 )
                 logger.info('Удален админ')
                 manager.del_admin_flag = False
-
-    if manager.set_interval_flag[message.from_user.id]:
-        value = await get_msg(message, manager.interval[message.from_user.id])
-        channel = GetParticipantInfo(
-                client, value[0]
-            )
-        if value[1] == 'no_interval':
-            await client.send_message(
-                message.chat.id,
-                'Собираю данные. Интервал не настроен. По окончании придет ссылка на файл',
-                reply_markup=main_menu_keyboard
-            )
-            logger.info('Идет сбора данных')
-            await get_data(channel, client, message)
-        else:
-            await client.send_message(
-                message.chat.id,
-                f'Собираю данные. Задача будет выполняться с заданным интервалом - {value[1]} мин. По окончании будет приходить ссылка на файл',
-                reply_markup=main_menu_keyboard
-            )
-            logger.info('Идет сбор данных')
-            await get_data(channel, client, message)
-            scheduler.add_job(get_data, 'interval', minutes=int(value[1]), kwargs={'channel': channel, 'client': client, 'message': message}, id=value[0] + f'_{message.from_user.id}', replace_existing=True)
-            logger.info(f'Запланирован сбор данных с интервалом {value[1]} минут')
-            logger.info(scheduler.print_jobs())
-        del manager.interval[message.from_user.id]
-        del manager.set_interval_flag[message.from_user.id]

@@ -70,6 +70,16 @@ time_keyboard = InlineKeyboardMarkup(
 
 async def make_inline_keyboard(value):
     lst = []
+    for i in value.chats:
+        button = [InlineKeyboardButton(text=i.title, callback_data=i.username)]
+        lst.append(button)
+    lst.append([InlineKeyboardButton(text='Другое', callback_data='other')])
+    keyboard = InlineKeyboardMarkup(lst)
+    return keyboard
+
+
+async def make_inline_keyboard_report(value):
+    lst = []
     for i, v in value.items():
         button = [InlineKeyboardButton(text=i, callback_data=v)]
         lst.append(button)

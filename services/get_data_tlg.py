@@ -92,7 +92,7 @@ async def get_country_language_code(language_code):
     return LANGUAGE_CODES.get(language_code, "Неизвестно")
 
 
-async def get_data(channel, client, message):
+async def get_data(channel, client, callback):
     member_list = await channel.get_members_channel()
     async with Aiogoogle(
         service_account_creds=Configs.CREDENTIALS
@@ -113,19 +113,11 @@ async def get_data(channel, client, message):
             member_list, sheet_name
         )
         await client.send_message(
-            message.chat.id,
+            callback.message.chat.id,
             f"Собрана информация о {len(member_list)} пользователях. Ссылка на файл:\n"
             f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
         )
         logger.info(f'Собрана информация о {len(member_list)} пользователях')
-
-
-async def get_msg(msg, interval):
-    lst = msg.text.split(', ')
-    if len(lst) == 2:
-        return lst
-    else:
-        return [msg.text, interval]
 
 
 @bot_user

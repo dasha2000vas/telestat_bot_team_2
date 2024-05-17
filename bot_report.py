@@ -1,6 +1,6 @@
 from pyrogram.client import Client
 from pyrogram import filters
-from pyrogram.types import Message
+from pyrogram.types import Message, CallbackQuery
 from settings import Configs, manager, configure_logging
 from constants import Commands
 from services.google_api_services import (
@@ -8,7 +8,7 @@ from services.google_api_services import (
     delete_all_files_by_name
 )
 from services.get_data_tlg import get_activity
-from buttons.buttons import report_menu_keyboard
+from buttons.buttons import report_menu_keyboard, make_inline_keyboard_report
 
 from permissions.permissions import check_admin
 
@@ -63,38 +63,45 @@ async def report(
             message.chat.id, 'Сформировать отчет может только админ!')
         logger.warning(f'Пользователь {message.from_user.username} пытался сформировать отчет')
     else:
+        manager.files[message.from_user.id] = await get_all_files()
         await client.send_message(
             message.chat.id,
             'Введите название канала',
+            reply_markup=await make_inline_keyboard_report(manager.files[message.from_user.id])
         )
         manager.set_report_flag[message.from_user.id] = True
 
 
-@bot_report.on_message(filters.text)
+# @bot_report.on_message(filters.text)
+@bot_report.on_callback_query()
 async def all_incoming_messages(
     client: Client,
-    message: Message,
+    callback: CallbackQuery,
     manager=manager
 ):
     """Ловим все сообщения в зависимости от наличия флага"""
-    if manager.set_report_flag[message.from_user.id]:
-        manager.report[message.from_user.id] = message.text
-        await client.send_message(message.chat.id, 'Идет формирование отчета')
-        logger.info(f'Идет формирование отчета канала {manager.report[message.from_user.id]}')
-        files = await get_all_files()
-        res = await get_sheet_lists(files[manager.report[message.from_user.id]])
-        data = await get_data_from_lists(files[manager.report[message.from_user.id]], res)
-        activity = await get_activity(manager.report[message.from_user.id])
+    if manager.set_report_flag[callback.from_user.id]:
+        manager.report[callback.from_user.id] = callback.data
+        username = ''
+        for name in manager.files[callback.from_user.id]:
+            if manager.files[callback.from_user.id][name] == callback.data:
+                username = name
+        await callback.edit_message_text('Идет формирование отчета', reply_markup=None)
+        logger.info(f'Идет формирование отчета канала {username}')
+        res = await get_sheet_lists(manager.report[callback.from_user.id])
+        data = await get_data_from_lists(manager.report[callback.from_user.id], res)
+        activity = await get_activity(username)
         msg = ''
         for k in data:
-            msg = (f'Отчет по каналу {manager.report[message.from_user.id]}\n'
+            msg = (f'Отчет по каналу {username}\n'
                    f'Кол-во подписчиков: {data[max(data)]}\n'
                    f'Приток/отток подписчиков: {data[max(data)] - data[min(data)]}\n'
                    f'Среднее количество просмотров: {activity["avg_views"]}\n'
                    f'Среднее количество реакций: {activity["avg_reactions"]}\n'
                    f'Среднее количество репостов: {activity["avg_forwards"]}\n'
                    )
-        await client.send_message(message.chat.id, msg)
-        logger.info(f'Формирование отчета по каналу {manager.report[message.from_user.id]} завершено')
-        del manager.set_report_flag[message.from_user.id]
-        del manager.report[message.from_user.id]
+        await client.send_message(callback.message.chat.id, msg)
+        logger.info(f'Формирование отчета по каналу {username} завершено')
+        del manager.set_report_flag[callback.from_user.id]
+        del manager.report[callback.from_user.id]
+        del manager.files[callback.from_user.id]
