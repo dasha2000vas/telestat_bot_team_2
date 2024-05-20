@@ -7,8 +7,6 @@ from crud.admins import admins_crud
 
 from settings import SUPERUSER, configure_logging
 
-logger = configure_logging()
-
 
 def use_inspector(conn):
     inspector = inspect(conn)

@@ -5,20 +5,11 @@ from aiogoogle.auth.creds import ServiceAccountCreds
 
 from dotenv import load_dotenv
 from constants import BotParseManager
-import logging
-from pathlib import Path
-from logging.handlers import RotatingFileHandler
 
 manager = BotParseManager()
 
 
 load_dotenv()
-
-
-BASE_DIR = Path(__file__).parent
-LOG_FORMAT = '#%(levelname)-8s [%(asctime)s] - %(filename)s:'\
-             '%(lineno)d - %(name)s - %(message)s'
-DT_FORMAT = '%d.%m.%Y %H:%M:%S'
 
 
 SCOPES = [
@@ -85,27 +76,3 @@ def bot_user(func):
         finally:
             await user_bot.stop()
     return wrapper
-
-
-def configure_logging():
-    """Конфигурация логов."""
-
-    log_dir = BASE_DIR / 'logs'
-    log_dir.mkdir(exist_ok=True)
-    log_file = log_dir / 'telestat_bot.log'
-    rotating_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10 ** 6,
-        backupCount=5,
-        encoding='utf-8',
-    )
-    logging.basicConfig(
-        datefmt=DT_FORMAT,
-        format=LOG_FORMAT,
-        level=logging.INFO,
-        handlers=(
-            rotating_handler,
-            logging.StreamHandler(),
-        ),
-    )
-    return logging
