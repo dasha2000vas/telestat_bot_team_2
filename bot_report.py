@@ -1,7 +1,7 @@
 from pyrogram.client import Client
 from pyrogram import filters
 from pyrogram.types import Message, CallbackQuery
-from settings import Configs, manager
+from settings import Configs, manager, configure_logging
 from constants import Commands
 from services.google_api_services import (
     get_all_files, get_sheet_lists, get_data_from_lists,
@@ -12,6 +12,7 @@ from buttons.buttons import report_menu_keyboard, make_inline_keyboard_report
 
 from permissions.permissions import check_admin
 
+logger = configure_logging()
 
 bot_report = Client(
     'report_acc',
@@ -32,12 +33,14 @@ async def command_start(
             message.chat.id,
             'Управлять ботом могут только Администраторы.'
         )
+        logger.warning(f'Пользователь {message.from_user.username} не прошел авторизацию')
     else:
         await client.send_message(
             message.chat.id,
             'Вы прошли авторизацию!',
             reply_markup=report_menu_keyboard
         )
+        logger.info(f'Пользователь {message.from_user.username} прошел авторизацию')
 
 
 @bot_report.on_message(filters.command('delete_sheet'))
@@ -58,6 +61,7 @@ async def report(
     if not await check_admin(message.from_user.id):
         await client.send_message(
             message.chat.id, 'Сформировать отчет может только админ!')
+        logger.warning(f'Пользователь {message.from_user.username} пытался сформировать отчет')
     else:
         manager.files[message.from_user.id] = await get_all_files()
         await client.send_message(
@@ -83,6 +87,7 @@ async def all_incoming_messages(
             if manager.files[callback.from_user.id][name] == callback.data:
                 username = name
         await callback.edit_message_text('Идет формирование отчета', reply_markup=None)
+        logger.info(f'Идет формирование отчета канала {username}')
         res = await get_sheet_lists(manager.report[callback.from_user.id])
         data = await get_data_from_lists(manager.report[callback.from_user.id], res)
         activity = await get_activity(username)
@@ -96,6 +101,7 @@ async def all_incoming_messages(
                    f'Среднее количество репостов: {activity["avg_forwards"]}\n'
                    )
         await client.send_message(callback.message.chat.id, msg)
+        logger.info(f'Формирование отчета по каналу {username} завершено')
         del manager.set_report_flag[callback.from_user.id]
         del manager.report[callback.from_user.id]
         del manager.files[callback.from_user.id]
