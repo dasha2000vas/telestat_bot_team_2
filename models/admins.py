@@ -18,3 +18,4 @@ class Admins(Base):
 
     def as_dict(self):
         return {i.name: getattr(self, i.name) for i in self.__table__.columns}
+ 
