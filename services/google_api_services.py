@@ -1,7 +1,9 @@
 from datetime import datetime
 from aiogoogle import Aiogoogle
 
-from settings import Configs
+from settings import Configs, configure_logging
+
+logger = configure_logging()
 
 
 async def set_user_permissions(wrapper_services, spreadsheetId):
@@ -31,6 +33,7 @@ async def check_spreadsheet_exist(wrapper_services, title):
     )
     for file in response['files']:
         if file['name'] == title:
+            logger.info(f'Обнаружено файл с именем {title}')
             return file['id']
 
 
@@ -57,6 +60,7 @@ async def create_sheet(wrapper_services, spreadsheet_id):
             json=body
         )
     )
+    logger.info(f'Лист с именем {sheet_name} создан')
     return sheet_name
 
 
@@ -84,6 +88,7 @@ async def create_spreadsheet(wrapper_services, title):
     )
     spreadsheetId = response['spreadsheetId']
     await set_user_permissions(wrapper_services, spreadsheetId)
+    logger.info(f'Файл с именем {sheet_name} создан')
     return spreadsheetId, sheet_name
 
 
@@ -149,6 +154,7 @@ async def get_all_files():
         res = {}
         for file in json_res['files']:
             res[file['name']] = file['id']
+        logger.info(f'Найдены файлы: {res}')
         return res
 
 
@@ -168,6 +174,7 @@ async def get_sheet_lists(value):
         list_title = []
         for i in json_res['sheets']:
             list_title.append(i['properties']['title'])
+        logger.info(f'Найдены листы: {list_title}')
         return list_title
 
 
@@ -190,6 +197,7 @@ async def get_data_from_lists(id, value):
                 ),
             )
             res[item] = len(json_res['values'])
+        logger.info('Собраны данные из последних двух листов таблицы')
         return res
 
 
@@ -207,3 +215,4 @@ async def delete_all_files_by_name(name):
             service.files.delete(fileId=res[name])
         )
         print(f"All files with name {name} delete.")
+

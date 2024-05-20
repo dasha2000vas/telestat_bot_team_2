@@ -1,6 +1,6 @@
 from pyrogram import Client
 from constants import COUNTRY_CODES, LANGUAGE_CODES
-from settings import Configs
+from settings import Configs, configure_logging
 from aiogoogle import Aiogoogle
 from pyrogram.raw import functions
 from settings import bot_user, user_bot
@@ -11,6 +11,8 @@ from services.google_api_services import (
     spreadsheet_update_values,
 )
 from string import ascii_lowercase
+
+logger = configure_logging()
 
 
 class GetParticipantInfo():
@@ -115,6 +117,7 @@ async def get_data(channel, client, callback):
             f"Собрана информация о {len(member_list)} пользователях. Ссылка на файл:\n"
             f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
         )
+        logger.info(f'Собрана информация о {len(member_list)} пользователях')
 
 
 @bot_user
@@ -148,6 +151,7 @@ async def get_chat_messages(chat_id):
     last_messages = []
     async for message in user_bot.get_chat_history(chat_id):
         last_messages.append(message)
+    logger.info('Собраны последние сообщения')
     return last_messages
 
 
@@ -180,4 +184,5 @@ async def get_activity(chat_id):
         'avg_reactions': 0 if len(reactions) == 0 else round(sum(reactions)/len(reactions), 2),
         'avg_forwards': 0 if len(forwards) == 0 else round(sum(forwards)/len(forwards), 2)
         }
+    logger.info('Собраны данные о последних активностях')
     return data

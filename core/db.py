@@ -14,6 +14,7 @@ from sqlalchemy.orm import (
 from settings import (
     Configs, configure_logging
 )
+
 logger = configure_logging()
 
 
