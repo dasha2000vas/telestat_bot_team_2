@@ -136,3 +136,82 @@ async def spreadsheet_update_values(
             json=request_body
         )
     )
+
+
+async def get_all_files():
+    """
+    Функция для получения названий и ссылок на все файлы на гугл диске.
+    """
+    async with Aiogoogle(
+        service_account_creds=Configs.CREDENTIALS
+    ) as wrapper_services:
+        service = await wrapper_services.discover('drive', 'v3')
+        json_res = await wrapper_services.as_service_account(
+            service.files.list(
+                q='mimeType="application/vnd.google-apps.spreadsheet"'
+            ),
+        )
+        res = {}
+        for file in json_res['files']:
+            res[file['name']] = file['id']
+        logger.info(f'Найдены файлы: {res}')
+        return res
+
+
+async def get_sheet_lists(value):
+    """
+    Функция для получения списка листов в таблице.
+    """
+    async with Aiogoogle(
+        service_account_creds=Configs.CREDENTIALS
+    ) as wrapper_services:
+        service = await wrapper_services.discover('sheets', 'v4')
+        json_res = await wrapper_services.as_service_account(
+            service.spreadsheets.get(
+                spreadsheetId=value,
+            ),
+        )
+        list_title = []
+        for i in json_res['sheets']:
+            list_title.append(i['properties']['title'])
+        logger.info(f'Найдены листы: {list_title}')
+        return list_title
+
+
+async def get_data_from_lists(id, value):
+    """
+    Функция для получения данных из двух последних листов таблицы.
+    """
+    async with Aiogoogle(
+        service_account_creds=Configs.CREDENTIALS
+    ) as wrapper_services:
+        res = {}
+        service = await wrapper_services.discover('sheets', 'v4')
+        if len(value) > 2:
+            value = value[-2:]
+        for item in value:
+            json_res = await wrapper_services.as_service_account(
+                service.spreadsheets.values.get(
+                    spreadsheetId=id,
+                    range=f"{item}!A3:J250"
+                ),
+            )
+            res[item] = len(json_res['values'])
+        logger.info('Собраны данные из последних двух листов таблицы')
+        return res
+
+
+async def delete_all_files_by_name(name):
+    """
+    Функция для удаления файлов по названию.
+    """
+    res = await get_all_files()
+    print(res)
+    async with Aiogoogle(
+        service_account_creds=Configs.CREDENTIALS
+    ) as wrapper_services:
+        service = await wrapper_services.discover('drive', 'v3')
+        await wrapper_services.as_service_account(
+            service.files.delete(fileId=res[name])
+        )
+        print(f"All files with name {name} delete.")
